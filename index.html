@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amigo Chocolate 🍫</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍫</text></svg>">
+<style>
+:root{--bg:#faf3ec;--card:#fff;--ink:#3b2a20;--mute:#7a665a;--accent:#7b3f1d;--accent-ink:#fff;--line:#e6d5c6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#1a100b;--card:#2d1e16;--ink:#f5e8dc;--mute:#bda898;--accent:#d9915a;--accent-ink:#20150f;--line:#4a3427;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:20px 14px}
+main{width:100%;max-width:440px}
+h1{font-family:Georgia,serif;font-size:1.9rem;margin:6px 0 2px;text-align:center}
+.sub{color:var(--mute);text-align:center;margin:0 0 20px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+label{display:block;font-weight:600;margin-bottom:8px}
+input{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+button{font:inherit;font-weight:600;width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #f5c542;outline-offset:2px}
+button.link{background:none;color:var(--mute);font-weight:400;text-decoration:underline;margin-top:6px;padding:6px;width:auto}
+button:disabled{opacity:.5;cursor:default}
+ul{list-style:none;margin:10px 0 0;padding:0}
+li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+li button{width:auto;margin:0;padding:4px 10px;font-weight:400;background:none;color:var(--mute);text-decoration:underline}
+.msg{color:var(--mute);text-align:center}
+.err{color:#c0392b;margin-top:10px;font-size:.9rem}
+.hint{color:var(--mute);font-size:.85rem;margin:8px 0 0}
+.machine{background:linear-gradient(#b3122a,#7d0a1c);border:4px solid #f5c542;border-radius:22px;padding:16px;box-shadow:0 0 0 4px #7d0a1c,0 10px 30px rgba(0,0,0,.45);color:#fff}
+.marquee{display:flex;justify-content:center;gap:8px;margin-bottom:10px}
+.bulb{width:12px;height:12px;border-radius:50%;background:#f5c542;animation:blink 1s infinite}
+.bulb:nth-child(even){animation-delay:.5s}
+@keyframes blink{50%{opacity:.25}}
+.title{text-align:center;font-family:Georgia,serif;font-weight:700;font-size:1.3rem;color:#f5c542;letter-spacing:2px;margin-bottom:10px}
+.reels{display:flex;gap:8px}
+.reel{flex:1;height:76px;background:#fff8e7;border:3px solid #f5c542;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;box-shadow:inset 0 6px 10px rgba(0,0,0,.25)}
+.namewin{margin-top:10px;height:78px;background:#111;border:3px solid #f5c542;border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 10px;font-family:Georgia,serif;font-weight:700;font-size:1.7rem;color:#ffe9a8;overflow:hidden;word-break:break-word}
+.namewin.win{animation:flash .5s 4;color:#fff}
+@keyframes flash{50%{background:#f5c542;color:#7d0a1c}}
+.pull{margin-top:14px;background:#f5c542;color:#7d0a1c;font-size:1.05rem;letter-spacing:1px;box-shadow:0 5px 0 #b88a12}
+.pull:active{transform:translateY(4px);box-shadow:0 1px 0 #b88a12}
+@media (prefers-reduced-motion:reduce){.bulb,.namewin.win{animation:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Amigo Chocolate 🍫</h1>
+<p class="sub">Irmandade dos Auxiliares Jovem</p>
+<div id="app"><p class="msg">Carregando…</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const app = document.getElementById('app');
+const S = {
+  sb: null, me: null, players: [], status: null, adminList: null,
+  result: undefined, spinning: false, err: '', draft: '', adminOpen: false, code: '', codeDraft: '', sig: ''
+};
+const SYMS = ['🍫', '🍬', '🍭', '🍩', '🎁', '🍪'];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  kids.forEach(k => e.append(k));
+  return e;
+}
+function beep(f, d) {
+  try {
+    const c = new (window.AudioContext || window.webkitAudioContext)();
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = f; g.gain.value = 0.08; o.connect(g); g.connect(c.destination);
+    o.start(); setTimeout(() => { o.stop(); c.close(); }, d);
+  } catch (e) {}
+}
+function msgOf(e) { return (e && e.message) ? e.message : 'Algo deu errado. Tente de novo.'; }
+
+async function init() {
+  const cfg = window.APP_CONFIG || {};
+  if (!cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes('SEU-PROJETO') ||
+      !cfg.SUPABASE_PUBLISHABLE_KEY || cfg.SUPABASE_PUBLISHABLE_KEY.includes('SUA-CHAVE-PUBLICA')) {
+    app.replaceChildren(el('p', { className: 'err', textContent: 'Falta configurar o config.js com a URL e a chave do Supabase.' }));
+    return;
+  }
+  S.sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
+  let { data: { session } } = await S.sb.auth.getSession();
+  if (!session) {
+    const { data, error } = await S.sb.auth.signInAnonymously();
+    if (error) {
+      app.replaceChildren(el('p', { className: 'err', textContent: 'Não foi possível entrar. Ative "Anonymous sign-ins" no Supabase (Authentication > Providers). ' + msgOf(error) }));
+      return;
+    }
+    session = data.session;
+  }
+  S.me = session.user.id;
+  await refresh();
+  setInterval(() => { if (!S.spinning) refresh(); }, 5000);
+}
+
+async function refresh() {
+  const [pl, st] = await Promise.all([
+    S.sb.from('players').select('id,name').order('name'),
+    S.sb.rpc('my_status')
+  ]);
+  if (pl.error || st.error) { S.err = msgOf(pl.error || st.error); render(); return; }
+  S.players = pl.data || [];
+  S.status = st.data;
+  if (S.code) {
+    const r = await S.sb.rpc('admin_status', { p_code: S.code });
+    if (r.error) { S.code = ''; S.adminList = null; S.err = msgOf(r.error); } else S.adminList = r.data;
+  }
+  if (!S.status.drawn || !S.status.has_assignment || !S.status.revealed) {
+    // Se o organizador liberar novamente ou reiniciar o sorteio, limpa o resultado antigo.
+    S.result = undefined;
+  } else if (S.result === undefined || S.result === false) {
+    const r = await S.sb.rpc('reveal');
+    S.result = r.error ? false : (r.data && r.data[0] ? r.data[0].out_name : false);
+    if (r.error) S.err = msgOf(r.error);
+  }
+  const sig = JSON.stringify([S.players, S.status, S.adminList, S.result, S.err, S.adminOpen, S.code]);
+  if (sig !== S.sig) { S.sig = sig; render(); }
+}
+
+async function act(fn) {
+  S.err = '';
+  const r = await fn();
+  if (r && r.error) S.err = msgOf(r.error);
+  S.sig = '';
+  await refresh();
+}
+
+/* ---------- views ---------- */
+function registerView() {
+  const mine = S.players.find(p => p.id === S.me);
+  const box = el('div', { className: 'card' });
+  if (mine) {
+    box.append(el('label', { textContent: 'Você está inscrito(a) como: ' + mine.name }),
+      el('p', { className: 'hint', textContent: 'Quando o organizador fizer o sorteio, volte aqui e puxe a alavanca. Só você vai ver o seu resultado.' }));
+    const leave = el('button', { className: 'link', textContent: 'Sair da lista' });
+    leave.onclick = () => act(() => S.sb.rpc('leave_game'));
+    box.append(leave);
+  } else {
+    const inp = el('input', { placeholder: 'Seu nome', maxLength: 40, value: S.draft });
+    inp.oninput = () => { S.draft = inp.value; };
+    const btn = el('button', { textContent: 'Entrar no sorteio' });
+    btn.onclick = () => {
+      const name = inp.value.trim();
+      if (!name) return;
+      btn.disabled = true;
+      act(async () => {
+        const r = await S.sb.rpc('join_game', { p_name: name });
+        if (r.error && r.error.code === '23505') r.error = { message: 'Esse nome já está na lista.' };
+        if (!r.error) S.draft = '';
+        return r;
+      });
+    };
+    box.append(el('label', { textContent: 'Qual é o seu nome?' }), inp, btn);
+  }
+  return box;
+}
+
+function listView() {
+  const box = el('div', { className: 'card' }, el('label', { textContent: 'Inscritos (' + S.players.length + ')' }));
+  if (!S.players.length) box.append(el('p', { className: 'hint', textContent: 'Ninguém se inscreveu ainda.' }));
+  const ul = el('ul');
+  S.players.forEach(p => {
+    const li = el('li', {}, el('span', { textContent: p.name }));
+    if (S.code) {
+      const x = el('button', { textContent: 'remover' });
+      x.onclick = () => act(() => S.sb.rpc('admin_remove_player', { p_code: S.code, p_id: p.id }));
+      li.append(x);
+    }
+    ul.append(li);
+  });
+  box.append(ul);
+  return box;
+}
+
+function adminView() {
+  const box = el('div', { className: 'card' });
+  if (!S.code) {
+    const t = el('button', { className: 'link', textContent: S.adminOpen ? 'Fechar' : 'Sou o organizador' });
+    t.onclick = () => { S.adminOpen = !S.adminOpen; S.sig = ''; render(); };
+    box.append(t);
+    if (S.adminOpen) {
+      const inp = el('input', { type: 'password', placeholder: 'Código do organizador', value: S.codeDraft });
+      inp.oninput = () => { S.codeDraft = inp.value; };
+      const go = el('button', { textContent: 'Entrar como organizador' });
+      go.onclick = () => { S.code = S.codeDraft.trim(); S.codeDraft = ''; S.err = ''; S.sig = ''; refresh(); };
+      box.append(inp, go);
+    }
+    return box;
+  }
+  box.append(el('label', { textContent: 'Organizador' }));
+  const drawn = S.status.drawn;
+  if (!drawn) {
+    const go = el('button', { textContent: '🎰 Encerrar inscrições e sortear', disabled: S.players.length < 3 });
+    go.onclick = () => { go.disabled = true; act(() => S.sb.rpc('admin_run_draw', { p_code: S.code })); };
+    box.append(go, el('p', { className: 'hint', textContent: S.players.length < 3 ? 'São necessários pelo menos 3 inscritos.' : 'O sorteio é feito no servidor. Nem você vai ver quem tirou quem.' }));
+  } else {
+    const list = S.adminList || [];
+    box.append(el('p', { className: 'hint', textContent: 'Já puxaram a alavanca: ' + list.filter(p => p.revealed).length + ' de ' + list.length }));
+    const ul = el('ul');
+    list.forEach(p => {
+      const li = el('li', {}, el('span', { textContent: (p.revealed ? '✅ ' : '⏳ ') + p.name }));
+      if (p.revealed) {
+        const b = el('button', { textContent: 'liberar de novo' });
+        b.onclick = () => act(() => S.sb.rpc('admin_release', { p_code: S.code, p_id: p.id }));
+        li.append(b);
+      }
+      ul.append(li);
+    });
+    box.append(ul);
+    const re = el('button', { className: 'link', textContent: 'Reabrir inscrições (apaga o sorteio)' });
+    re.onclick = () => { S.result = undefined; act(() => S.sb.rpc('admin_reset', { p_code: S.code })); };
+    box.append(re);
+  }
+  const out = el('button', { className: 'link', textContent: 'Sair do modo organizador' });
+  out.onclick = () => { S.code = ''; S.adminList = null; S.sig = ''; render(); };
+  box.append(out);
+  return box;
+}
+
+function machineView() {
+  const st = S.status;
+  if (!st.has_assignment) return el('p', { className: 'msg', textContent: 'Você não estava na lista quando o sorteio foi feito.' });
+  const names = S.players.map(p => p.name);
+  const done = S.result !== undefined && S.result !== false;
+  const label = done ? 'VOCÊ JÁ SORTEOU ✅' : 'PUXAR A ALAVANCA 🎰';
+  const box = el('div');
+  const bulbs = el('div', { className: 'marquee' });
+  for (let i = 0; i < 9; i++) bulbs.append(el('div', { className: 'bulb' }));
+  const reels = el('div', { className: 'reels' });
+  const reelEls = [0, 1, 2].map(() => { const r = el('div', { className: 'reel', textContent: '🍫' }); reels.append(r); return r; });
+  const win = el('div', { className: 'namewin', textContent: done ? S.result : '? ? ?' });
+  if (done) win.classList.add('win');
+  const pull = el('button', { className: 'pull', textContent: label, disabled: done });
+  let armed = false, armTimer;
+  pull.onclick = async () => {
+    if (S.spinning || done) return;
+    if (!armed) {
+      armed = true; pull.textContent = 'TEM CERTEZA? TOQUE DE NOVO';
+      armTimer = setTimeout(() => { armed = false; pull.textContent = label; }, 4000);
+      return;
+    }
+    clearTimeout(armTimer);
+    S.spinning = true; pull.disabled = true; win.classList.remove('win');
+    const r = await S.sb.rpc('reveal');
+    if (r.error) { S.spinning = false; S.err = msgOf(r.error); S.sig = ''; render(); return; }
+    const result = r.data[0].out_name;
+    const timers = reelEls.map(rl => setInterval(() => { rl.textContent = SYMS[Math.floor(Math.random() * SYMS.length)]; beep(300 + Math.random() * 300, 30); }, 120));
+    const stopReel = async (i, ms) => { await sleep(ms); clearInterval(timers[i]); reelEls[i].textContent = '🍫'; beep(700 + i * 150, 120); };
+    stopReel(0, 900); stopReel(1, 1400); stopReel(2, 1900);
+    let delay = 60;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 2300) {
+      win.textContent = names[Math.floor(Math.random() * names.length)] || '🍫';
+      await sleep(delay); delay += 8;
+    }
+    await sleep(100);
+    win.textContent = result; win.classList.add('win');
+    try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch (e) {}
+    beep(900, 250); setTimeout(() => beep(1200, 350), 260);
+    await sleep(1200);
+    S.result = result; S.spinning = false; S.sig = ''; refresh();
+  };
+  box.append(el('div', { className: 'machine' },
+    bulbs, el('div', { className: 'title', textContent: 'AMIGO CHOCOLATE' }), reels, win, pull));
+  box.append(el('p', { className: 'hint', style: 'text-align:center', textContent: '🍫 Segredo! Só você vê quem tirou. Não conte para ninguém.' }));
+  return box;
+}
+
+function render() {
+  if (S.spinning) return;
+  app.replaceChildren();
+  if (!S.status) return;
+  if (S.status.drawn) app.append(machineView());
+  else app.append(registerView(), listView());
+  app.append(adminView());
+  if (S.err) app.append(el('div', { className: 'err', textContent: S.err }));
+}
+
+init();
+</script>
+</body>
+</html>
